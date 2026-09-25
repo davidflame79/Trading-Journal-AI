@@ -8,7 +8,7 @@ REM Use the repo's virtualenv if it exists
 if exist "%~dp0.venv\Scripts" set "PATH=%~dp0.venv\Scripts;%PATH%"
 
 REM Start backend
-start "Trading Journal AI - Backend" cmd /k "cd /d %~dp0backend && uvicorn main:app --reload --port 8010"
+start "Trading Journal AI - Backend" cmd /k "cd /d %~dp0backend && python -m uvicorn main:app --reload --port 8010"
 
 REM Wait a moment then start frontend
 timeout /t 2 /nobreak >nul

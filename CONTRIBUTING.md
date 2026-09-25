@@ -22,7 +22,7 @@ These decide most review questions, so they are worth knowing before you start:
 
 ## Setting up
 
-Requirements: Python 3.11+ and Node.js 18+.
+Requirements: Python 3.11+ and Node.js 18+ (CI uses Node 24).
 
 On Windows, run `setup.bat` once and `launch.bat` to start. By hand:
 

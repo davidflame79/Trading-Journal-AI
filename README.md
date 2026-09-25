@@ -135,7 +135,7 @@ the camera is running. Every prompt used in the video is in the video descriptio
 
 ## Quick start
 
-Requirements: [Python 3.11+](https://www.python.org/downloads/) and [Node.js 18+](https://nodejs.org/).
+Requirements: [Python 3.11+](https://www.python.org/downloads/) and [Node.js 18+](https://nodejs.org/) (the current LTS is recommended).
 
 **Windows, two steps:** download or clone the repo, then double-click
 
@@ -160,7 +160,7 @@ cd ..
 launch.bat
 ```
 
-`launch.bat` starts the FastAPI backend on http://localhost:8010 and the React frontend on http://localhost:3010. On Mac/Linux run them manually: `uvicorn main:app --reload --port 8010` from `backend/`, and `PORT=3010 npm start` from `frontend/`.
+`launch.bat` starts the FastAPI backend on http://localhost:8010 and the React frontend on http://localhost:3010. On Mac/Linux run them manually: `python -m uvicorn main:app --reload --port 8010` from `backend/`, and `PORT=3010 npm start` from `frontend/`.
 
 To run them on other ports, tell each side about the other: `REACT_APP_API_URL` for the frontend,
 and, only if the frontend is not on localhost, `FRONTEND_ORIGINS` (comma separated) for the

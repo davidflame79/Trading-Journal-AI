@@ -40,8 +40,13 @@ echo [3/4] Installing the frontend packages (a few minutes the first time)
 pushd frontend
 call npm ci --no-audit --no-fund --loglevel=error
 if errorlevel 1 (
-    popd
-    goto :fail
+    rem An older npm can reject a lock file written by a newer one; npm install reconciles it.
+    echo       Retrying with npm install
+    call npm install --no-audit --no-fund --loglevel=error
+    if errorlevel 1 (
+        popd
+        goto :fail
+    )
 )
 popd
 
