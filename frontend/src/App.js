@@ -139,6 +139,7 @@ export default function App() {
             accountId={selectedAccountId}
             accounts={accounts}
             onImportDone={() => {}}
+            onOpenDetail={handleOpenDetail}
           />
         )}
         {page === 'diary' && <Diary accountId={selectedAccountId} />}

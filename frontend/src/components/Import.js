@@ -157,7 +157,7 @@ function DropZone({ label, accept, onFile, file, icon: Icon }) {
   );
 }
 
-export default function Import({ accounts, accountId }) {
+export default function Import({ accounts, accountId, onOpenDetail }) {
   // CSV import state
   const [csvFile, setCsvFile] = useState(null);
   const [csvAccountId, setCsvAccountId] = useState(accountId || '');
@@ -297,6 +297,23 @@ export default function Import({ accounts, accountId }) {
               {csvResult.errors?.length > 0 && (
                 <div style={{ fontSize: 13, color: 'var(--result-neg)', marginTop: 4 }}>
                   {csvResult.errors.length} DB error(s)
+                </div>
+              )}
+              {csvResult.needs_comment?.length > 0 && (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>
+                    {(() => {
+                      const n = csvResult.needs_comment.reduce((sum, t) => sum + t.new_fill_count, 0);
+                      return `${n} new ${n === 1 ? 'fill needs' : 'fills need'} a comment`;
+                    })()}
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                    {csvResult.needs_comment.map(t => (
+                      <button key={t.id} type="button" className="btn btn-ghost btn-sm" onClick={() => onOpenDetail(t, csvResult.needs_comment, 'Strategy')}>
+                        {t.ticker} · {t.new_fill_count} {t.new_fill_count === 1 ? 'fill' : 'fills'}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

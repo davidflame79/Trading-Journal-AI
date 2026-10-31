@@ -4,6 +4,7 @@ import { ArrowLeft, ChevronLeft, ChevronRight, PlusCircle, Trash2, Pencil } from
 import { tradesApi, chartApi } from '../api';
 import TradingChart from './TradingChart';
 import TradeExits from './exitlab/TradeExits';
+import TradeTimeline from './TradeTimeline';
 import { DemoLabel } from './exitlab/shared';
 import { PageHeader, KpiStrip, KpiCell, MoneyValue, PanelHead } from './ui';
 
@@ -815,6 +816,7 @@ export default function TradeDetail({ trade: initialTrade, tradeNavList = [], on
                     )}
                   </>
                 )}
+                <TradeTimeline trade={trade} executions={parseExecs(trade)} />
               </div>
             )}
 

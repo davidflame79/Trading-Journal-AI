@@ -30,6 +30,10 @@ from ai_analysis import (
 from daily_summary import build_daily_context, generate_daily_summary
 from library import router as library_router, init_library_tables, apply_aliases, library_names
 from exitlab.api import router as exitlab_router
+from trade_comments import (
+    router as trade_comments_router, init_trade_comments_table, move_comments_on_regroup,
+    rekey_fill, delete_trade_comments, stored_fills, trades_needing_comments,
+)
 
 load_dotenv()
 
@@ -42,6 +46,7 @@ async def lifespan(app: FastAPI):
     _conn = get_db()
     try:
         init_library_tables(_conn)
+        init_trade_comments_table(_conn)
     finally:
         _conn.close()
     Path(UPLOAD_DIR).mkdir(exist_ok=True)
@@ -72,6 +77,7 @@ app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 # Settings > Library (strategies, sources, tags)
 app.include_router(library_router)
 app.include_router(exitlab_router)
+app.include_router(trade_comments_router)
 
 
 # ── Dependency ─────────────────────────────────────────────────────────────────
@@ -445,6 +451,7 @@ def _replace_regrouped_trades(conn, account_id: int, trades: list[dict]) -> None
         if not has_own:
             conn.execute("UPDATE trade_analysis SET trade_group=? WHERE trade_group=?", (target, g))
             conn.execute("UPDATE trade_tags SET trade_group=? WHERE trade_group=?", (target, g))
+    move_comments_on_regroup(conn, account_id, trades, old_groups, moves)
 
 
 @app.post("/api/import-csv")
@@ -467,6 +474,7 @@ async def import_csv(
     except UnicodeDecodeError:
         content = raw.decode('latin-1')
 
+    fills_before = stored_fills(conn, account_id)
     trades, skipped = parse_broker_csv(
         content, broker, account_id, conn,
         import_tz=get_app_settings(conn)["import_timezone"],
@@ -513,6 +521,7 @@ async def import_csv(
         "imported": imported,
         "skipped": skipped,
         "errors": errors,
+        "needs_comment": trades_needing_comments(conn, account_id, fills_before),
         "message": (f"Imported {imported} trade group(s). "
                     f"Skipped {skipped} duplicate execution(s)."),
     }
@@ -783,7 +792,9 @@ def update_execution(trade_id: int, exec_idx: int, body: dict, conn: sqlite3.Con
     execs = json.loads(trade.get('executions') or '[]')
     if exec_idx < 0 or exec_idx >= len(execs):
         raise HTTPException(status_code=404, detail="Execution index out of range")
-    execs[exec_idx] = _parse_exec_body(body, trade['date'])
+    new_exec = _parse_exec_body(body, trade['date'])
+    rekey_fill(conn, trade['account_id'], trade['trade_group'], execs[exec_idx], new_exec)
+    execs[exec_idx] = new_exec
     return _recalculate_and_save(trade, execs, conn, trade_id)
 
 
@@ -796,7 +807,7 @@ def delete_execution(trade_id: int, exec_idx: int, conn: sqlite3.Connection = De
     execs = json.loads(trade.get('executions') or '[]')
     if exec_idx < 0 or exec_idx >= len(execs):
         raise HTTPException(status_code=404, detail="Execution index out of range")
-    execs.pop(exec_idx)
+    rekey_fill(conn, trade['account_id'], trade['trade_group'], execs.pop(exec_idx), None)
     return _recalculate_and_save(trade, execs, conn, trade_id)
 
 
@@ -811,6 +822,7 @@ def delete_trade(trade_id: int, conn: sqlite3.Connection = Depends(get_connectio
 
     conn.execute("DELETE FROM trade_tags WHERE trade_group=?", (trade_group,))
     conn.execute("DELETE FROM trade_analysis WHERE trade_group=?", (trade_group,))
+    delete_trade_comments(conn, trade['account_id'], trade_group)
     conn.execute("DELETE FROM trades WHERE id=?", (trade_id,))
     conn.commit()
 

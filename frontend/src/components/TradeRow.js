@@ -31,7 +31,7 @@ export default function TradeRow({ trade, openTime, onOpenDetail, customSetups =
   const handleDelete = async (e) => {
     e.stopPropagation();
     const label = `${trade.ticker} on ${trade.date}`;
-    if (!window.confirm(`Delete this trade (${label})? This removes the trade and all its buy/sell executions permanently.`)) {
+    if (!window.confirm(`Delete this trade (${label})? This removes the trade, all its buy/sell executions and its comments permanently.`)) {
       return;
     }
     setDeleting(true);

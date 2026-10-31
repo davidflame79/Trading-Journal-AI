@@ -43,6 +43,10 @@ export const tradesApi = {
   addExecution: (id, data) => api.post(`/api/trades/${id}/executions`, data),
   updateExecution: (id, idx, data) => api.put(`/api/trades/${id}/executions/${idx}`, data),
   deleteExecution: (id, idx) => api.delete(`/api/trades/${id}/executions/${idx}`),
+  listComments: (id) => api.get(`/api/trades/${id}/comments`),
+  addComment: (id, data) => api.post(`/api/trades/${id}/comments`, data),
+  updateComment: (commentId, data) => api.patch(`/api/trade-comments/${commentId}`, data),
+  deleteComment: (commentId) => api.delete(`/api/trade-comments/${commentId}`),
 };
 
 export const importApi = {
