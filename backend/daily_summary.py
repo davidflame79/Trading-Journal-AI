@@ -1,6 +1,7 @@
 import json
 import re
 from ai_analysis import get_client, response_text
+from trade_notes import trade_note_lines
 
 MODEL = "claude-opus-5"
 
@@ -41,7 +42,7 @@ def build_daily_context(conn, date: str, account_id) -> dict:
 
     # Trades with joined analysis for the date
     sql = """
-        SELECT t.id, t.trade_group, t.ticker, t.side, t.instrument_type,
+        SELECT t.id, t.account_id, t.trade_group, t.ticker, t.side, t.instrument_type,
                t.net_pnl, t.gross_pnl, t.commissions, t.executions,
                t.option_type, t.option_strike, t.option_expiry,
                ta.strategy, ta.r_multiple, ta.stop_loss, ta.target_price,
@@ -66,6 +67,7 @@ def build_daily_context(conn, date: str, account_id) -> dict:
             d['executions'] = json.loads(d.get('executions') or '[]')
         except Exception:
             d['executions'] = []
+        d['notes'] = trade_note_lines(conn, d['account_id'], d['trade_group'])
         trades.append(d)
 
     # Day KPIs
@@ -160,6 +162,7 @@ def generate_daily_summary(context: dict) -> dict:
             f"first_entry_time: {first_time or 'N/A'}"
         )
         trade_lines.append(line)
+        trade_lines += [f"      {note}" for note in t.get("notes", [])]
 
     diary_section = ""
     if diary:

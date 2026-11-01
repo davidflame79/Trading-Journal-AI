@@ -6,6 +6,8 @@ import re
 from pathlib import Path
 from dotenv import load_dotenv
 
+from trade_notes import plan_line, trade_note_lines
+
 load_dotenv()
 
 MODEL = "claude-opus-5"
@@ -513,7 +515,7 @@ def generate_insights(trades_summary: dict) -> str:
 # ── Brain AI Chatbot ────────────────────────────────────────────────────────────
 
 BRAIN_SYSTEM_PROMPT = """You are "Brain", an expert AI trading coach embedded in a personal trading journal.
-You have access to the trader's complete trading history, diary entries, and performance data.
+You have access to the trader's complete trading history, written trade plans, comments on trades, diary entries, and performance data.
 
 Your capabilities:
 - Answer specific questions about performance with data references
@@ -528,7 +530,7 @@ If the data doesn't support a conclusion, say so — never fabricate numbers."""
 def build_brain_context(conn, account_id) -> str:
     """Build a compact trading context string for Brain's system prompt."""
     rows = conn.execute("""
-        SELECT t.date, t.ticker, t.side, t.instrument_type, t.net_pnl, t.gross_pnl,
+        SELECT t.account_id, t.trade_group, t.date, t.ticker, t.side, t.instrument_type, t.net_pnl, t.gross_pnl,
                ta.strategy, ta.r_multiple, ta.emotional_state, ta.mistakes,
                ta.stop_loss, ta.target_price
         FROM trades t
@@ -585,6 +587,7 @@ def build_brain_context(conn, account_id) -> str:
         if t['mistakes']:
             line += f" | MISTAKE: {t['mistakes']}"
         trade_lines.append(line)
+        trade_lines += [f"    {note}" for note in trade_note_lines(conn, t['account_id'], t['trade_group'])]
 
     # Diary summaries
     diary_rows = conn.execute("""
@@ -606,6 +609,27 @@ def build_brain_context(conn, account_id) -> str:
         except Exception:
             pass
 
+    # Summaries written when a trade closed
+    summary_rows = conn.execute("""
+        SELECT s.close_date, s.content, t.ticker FROM trade_summaries s
+        JOIN trades t ON t.account_id = s.account_id AND t.trade_group = s.trade_group
+        WHERE (? IS NULL OR s.account_id = ?) AND s.content IS NOT NULL
+        ORDER BY s.close_date DESC LIMIT 10
+    """, (account_id, account_id)).fetchall()
+    for s in summary_rows:
+        content = json.loads(s['content'])
+        diary_lines.append(f"  {s['close_date']} {s['ticker']}: {content.get('headline', '')}")
+        if content.get('lessons'):
+            diary_lines.append(f"    Lessons: {'; '.join(content['lessons'][:3])}")
+
+    # Setups written down but not entered
+    open_plans = conn.execute("""
+        SELECT * FROM trade_plans
+        WHERE (? IS NULL OR account_id = ?) AND status = 'planned'
+        ORDER BY COALESCE(plan_date, created_at) DESC LIMIT 20
+    """, (account_id, account_id)).fetchall()
+    plan_lines = [f"  {p['symbol']} {p['direction']} | {plan_line(p)}" for p in open_plans]
+
     return f"""=== ACCOUNT PERFORMANCE ===
 Period: {date_range}
 Total Trades: {len(trades)} | Win Rate: {win_rate:.1f}% | Net P&L: ${total_pnl:.2f}
@@ -616,6 +640,9 @@ Avg Win: ${avg_win:.2f} | Avg Loss: ${avg_loss:.2f} | Profit Factor: {profit_fac
 
 === RECENT TRADES (newest first, up to 50) ===
 {chr(10).join(trade_lines) or '  No trades'}
+
+=== PLANS NOT YET ENTERED ===
+{chr(10).join(plan_lines) or '  None'}
 
 === DIARY INSIGHTS ===
 {chr(10).join(diary_lines) or '  No diary entries'}"""
