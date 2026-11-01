@@ -47,6 +47,19 @@ export const tradesApi = {
   addComment: (id, data) => api.post(`/api/trades/${id}/comments`, data),
   updateComment: (commentId, data) => api.patch(`/api/trade-comments/${commentId}`, data),
   deleteComment: (commentId) => api.delete(`/api/trade-comments/${commentId}`),
+  getPlan: (id) => api.get(`/api/trades/${id}/plan`),
+  attachPlan: (id, planId) => api.post(`/api/trades/${id}/plan`, { plan_id: planId }),
+  detachPlan: (id) => api.delete(`/api/trades/${id}/plan`),
+};
+
+export const plansApi = {
+  options: () => api.get('/api/plans/options'),
+  saveOptions: (data) => api.put('/api/plans/options', data),
+  list: (params) => api.get('/api/plans', { params }),
+  create: (data) => api.post('/api/plans', data),
+  update: (id, data) => api.put(`/api/plans/${id}`, data),
+  setStatus: (id, status) => api.patch(`/api/plans/${id}/status`, { status }),
+  delete: (id) => api.delete(`/api/plans/${id}`),
 };
 
 export const importApi = {

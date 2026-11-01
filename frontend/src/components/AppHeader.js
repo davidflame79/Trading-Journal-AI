@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import {
   LayoutDashboard, TrendingUp, BarChart2, BookOpen, Plus, ChevronDown,
-  CalendarDays, Check, X, Pencil, CalendarCheck, HelpCircle, Upload, Brain, FlaskConical, Settings as SettingsIcon,
-} from 'lucide-react';
+  CalendarDays, Check, X, Pencil, CalendarCheck, HelpCircle, Upload, Brain, FlaskConical, Settings as SettingsIcon, ClipboardList } from 'lucide-react';
 import { accountsApi } from '../api';
 import aiJournalLogo from '../assets/ai-journal-logo.png';
 
@@ -10,6 +9,7 @@ import aiJournalLogo from '../assets/ai-journal-logo.png';
 // account selector, Help and Settings on the right; seven pages keep their labels.
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'plans', label: 'Plans', icon: ClipboardList },
   { id: 'trades', label: 'Trade View', icon: TrendingUp },
   { id: 'calendar', label: 'Calendar', icon: CalendarDays },
   { id: 'day-review', label: 'Day Review', icon: CalendarCheck },

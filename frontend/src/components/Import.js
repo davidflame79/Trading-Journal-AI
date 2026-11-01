@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Upload, FileText, Image, CheckCircle, AlertCircle } from 'lucide-react';
 import { importApi } from '../api';
 import { PageHeader } from './ui';
+import { PlanMatches } from './TradePlans';
 
 // Brokers the backend can parse (keys match csv_parser.BROKER_PARSERS).
 // 'auto' lets the server sniff the format from the file's first lines.
@@ -299,6 +300,7 @@ export default function Import({ accounts, accountId, onOpenDetail }) {
                   {csvResult.errors.length} DB error(s)
                 </div>
               )}
+              {csvResult.plan_matches?.length > 0 && <PlanMatches matches={csvResult.plan_matches} />}
               {csvResult.needs_comment?.length > 0 && (
                 <div style={{ marginTop: 10 }}>
                   <div style={{ fontSize: 14, fontWeight: 600 }}>

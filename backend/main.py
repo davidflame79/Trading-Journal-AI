@@ -34,6 +34,10 @@ from trade_comments import (
     router as trade_comments_router, init_trade_comments_table, move_comments_on_regroup,
     rekey_fill, delete_trade_comments, stored_fills, trades_needing_comments,
 )
+from trade_plans import (
+    router as trade_plans_router, init_trade_plans_table, move_plans_on_regroup,
+    rekey_opening_fill, release_plan, plans_for_new_trades,
+)
 
 load_dotenv()
 
@@ -47,6 +51,7 @@ async def lifespan(app: FastAPI):
     try:
         init_library_tables(_conn)
         init_trade_comments_table(_conn)
+        init_trade_plans_table(_conn)
     finally:
         _conn.close()
     Path(UPLOAD_DIR).mkdir(exist_ok=True)
@@ -78,6 +83,7 @@ app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 app.include_router(library_router)
 app.include_router(exitlab_router)
 app.include_router(trade_comments_router)
+app.include_router(trade_plans_router)
 
 
 # ── Dependency ─────────────────────────────────────────────────────────────────
@@ -452,6 +458,7 @@ def _replace_regrouped_trades(conn, account_id: int, trades: list[dict]) -> None
             conn.execute("UPDATE trade_analysis SET trade_group=? WHERE trade_group=?", (target, g))
             conn.execute("UPDATE trade_tags SET trade_group=? WHERE trade_group=?", (target, g))
     move_comments_on_regroup(conn, account_id, trades, old_groups, moves)
+    move_plans_on_regroup(conn, account_id, trades, old_groups, moves)
 
 
 @app.post("/api/import-csv")
@@ -522,6 +529,7 @@ async def import_csv(
         "skipped": skipped,
         "errors": errors,
         "needs_comment": trades_needing_comments(conn, account_id, fills_before),
+        "plan_matches": plans_for_new_trades(conn, account_id, fills_before),
         "message": (f"Imported {imported} trade group(s). "
                     f"Skipped {skipped} duplicate execution(s)."),
     }
@@ -794,6 +802,7 @@ def update_execution(trade_id: int, exec_idx: int, body: dict, conn: sqlite3.Con
         raise HTTPException(status_code=404, detail="Execution index out of range")
     new_exec = _parse_exec_body(body, trade['date'])
     rekey_fill(conn, trade['account_id'], trade['trade_group'], execs[exec_idx], new_exec)
+    rekey_opening_fill(conn, trade['account_id'], trade['trade_group'], execs[exec_idx], new_exec)
     execs[exec_idx] = new_exec
     return _recalculate_and_save(trade, execs, conn, trade_id)
 
@@ -823,6 +832,7 @@ def delete_trade(trade_id: int, conn: sqlite3.Connection = Depends(get_connectio
     conn.execute("DELETE FROM trade_tags WHERE trade_group=?", (trade_group,))
     conn.execute("DELETE FROM trade_analysis WHERE trade_group=?", (trade_group,))
     delete_trade_comments(conn, trade['account_id'], trade_group)
+    release_plan(conn, trade['account_id'], trade_group)
     conn.execute("DELETE FROM trades WHERE id=?", (trade_id,))
     conn.commit()
 

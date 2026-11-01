@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, Pencil, GitMerge, Trash2, Search } from 'lucide-react';
 import { libraryApi, appSettingsApi } from '../api';
 import { PageHeader } from './ui';
+import { PlanOptionSettings } from './TradePlans';
 
 const SECTIONS = [
   { id: 'general', label: 'General' },
@@ -415,7 +416,7 @@ export default function Settings() {
       </div>
 
       <div role="tabpanel" id="settings-panel" aria-labelledby={`settings-tab-${section}`}>
-        {section === 'general' && <GeneralSettings />}
+        {section === 'general' && <><GeneralSettings /><PlanOptionSettings /></>}
         {section !== 'general' && loadError && <div className="notice neg" role="alert">{loadError}</div>}
         {section !== 'general' && !lib && !loadError && <div className="skeleton" style={{ height: 320 }} />}
 

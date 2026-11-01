@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard';
 import Trades from './components/Trades';
 import Calendar from './components/Calendar';
 import Import from './components/Import';
+import Plans from './components/TradePlans';
 import Diary from './components/Diary';
 import AddTradeModal from './components/AddTradeModal';
 import TradeDetail from './components/TradeDetail';
@@ -126,6 +127,7 @@ export default function App() {
             onTradeUpdate={(updated) => setSelectedTrade(updated)}
             onNavigate={(trade) => setSelectedTrade(trade)}
             onOpenDetail={handleOpenDetail}
+            accounts={accounts}
           />
         )}
         {page === 'calendar' && (
@@ -142,6 +144,7 @@ export default function App() {
             onOpenDetail={handleOpenDetail}
           />
         )}
+        {page === 'plans' && <Plans accounts={accounts} accountId={selectedAccountId} onOpenDetail={handleOpenDetail} />}
         {page === 'diary' && <Diary accountId={selectedAccountId} />}
         {page === 'day-review' && (
           <DailySummary

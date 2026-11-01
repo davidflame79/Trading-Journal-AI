@@ -5,6 +5,7 @@ import { tradesApi, chartApi } from '../api';
 import TradingChart from './TradingChart';
 import TradeExits from './exitlab/TradeExits';
 import TradeTimeline from './TradeTimeline';
+import { TradePlanCard } from './TradePlans';
 import { DemoLabel } from './exitlab/shared';
 import { PageHeader, KpiStrip, KpiCell, MoneyValue, PanelHead } from './ui';
 
@@ -326,7 +327,7 @@ function DaySidebar({ currentTrade, onOpenDetail }) {
   );
 }
 
-export default function TradeDetail({ trade: initialTrade, tradeNavList = [], onBack, onTradeUpdate, onNavigate, onOpenDetail, initialTab = 'Stats', backLabel = 'Back to trades' }) {
+export default function TradeDetail({ trade: initialTrade, tradeNavList = [], onBack, onTradeUpdate, onNavigate, onOpenDetail, initialTab = 'Stats', backLabel = 'Back to trades', accounts = [] }) {
   const [trade, setTrade] = useState(initialTrade);
   const [tab, setTab] = useState(initialTab);
   const [analysis, setAnalysis] = useState(null);
@@ -765,6 +766,13 @@ export default function TradeDetail({ trade: initialTrade, tradeNavList = [], on
             {/* ── Strategy tab ──────────────────────────────────────────── */}
             {tab === 'Strategy' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 8 }}>
+                <TradePlanCard
+                  trade={trade}
+                  accounts={accounts}
+                  actualEntry={stats.avgEntry}
+                  actualShares={stats.totalQty}
+                  onChanged={() => tradesApi.getAnalysis(trade.trade_group).then(r => setAnalysis(r.data.analysis || {})).catch(() => {})}
+                />
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                   {!editingStrategy ? (
                     <button
