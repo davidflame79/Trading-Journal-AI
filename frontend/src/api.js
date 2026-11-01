@@ -52,6 +52,8 @@ export const tradesApi = {
   detachPlan: (id) => api.delete(`/api/trades/${id}/plan`),
   getReview: (id) => api.get(`/api/trades/${id}/review`),
   runReview: (id) => api.post(`/api/trades/${id}/review`),
+  getSummary: (id) => api.get(`/api/trades/${id}/summary`),
+  writeSummary: (id) => api.post(`/api/trades/${id}/summary`),
 };
 
 export const plansApi = {
@@ -79,6 +81,8 @@ export const kpisApi = {
 
 export const diaryApi = {
   list: (params) => api.get('/api/diary', { params }),
+  listSummaries: (params) => api.get('/api/trade-summaries', { params }),
+  deleteSummary: (id) => api.delete(`/api/trade-summaries/${id}`),
   delete: (id) => api.delete(`/api/diary/${id}`),
   deleteByDate: (date, accountId) => api.delete(`/api/diary/by-date/${date}`, { params: accountId != null ? { account_id: accountId } : {} }),
 };

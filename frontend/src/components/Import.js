@@ -300,6 +300,11 @@ export default function Import({ accounts, accountId, onOpenDetail }) {
                   {csvResult.errors.length} DB error(s)
                 </div>
               )}
+              {csvResult.summaries_writing > 0 && (
+                <div style={{ marginTop: 10, fontSize: 14 }}>
+                  Writing {csvResult.summaries_writing === 1 ? 'a summary' : `${csvResult.summaries_writing} summaries`} of the closed {csvResult.summaries_writing === 1 ? 'trade' : 'trades'} for your Diary.
+                </div>
+              )}
               {csvResult.plan_matches?.length > 0 && <PlanMatches matches={csvResult.plan_matches} />}
               {csvResult.needs_comment?.length > 0 && (
                 <div style={{ marginTop: 10 }}>

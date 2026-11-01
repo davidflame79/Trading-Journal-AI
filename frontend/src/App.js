@@ -145,7 +145,7 @@ export default function App() {
           />
         )}
         {page === 'plans' && <Plans accounts={accounts} accountId={selectedAccountId} onOpenDetail={handleOpenDetail} />}
-        {page === 'diary' && <Diary accountId={selectedAccountId} />}
+        {page === 'diary' && <Diary accountId={selectedAccountId} onOpenDetail={handleOpenDetail} />}
         {page === 'day-review' && (
           <DailySummary
             accountId={selectedAccountId}

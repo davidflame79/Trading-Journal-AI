@@ -3,7 +3,8 @@ import TradeFeedback from './TradeFeedback';
 import { tradesApi } from '../api';
 
 jest.mock('../api', () => ({
-  tradesApi: { getReview: jest.fn(), runReview: jest.fn() },
+  diaryApi: {},
+  tradesApi: { getReview: jest.fn(), runReview: jest.fn(), getSummary: jest.fn(), writeSummary: jest.fn() },
 }));
 
 const TRADE = { id: 7, executions: '[]' };
@@ -31,6 +32,7 @@ test('nothing runs until asked, then the feedback shows', async () => {
 
 test('a closed trade calls the last section a lesson', async () => {
   tradesApi.getReview.mockResolvedValue({ data: SAVED });
+  tradesApi.getSummary.mockResolvedValue({ data: { summary: null } });
   render(<TradeFeedback trade={TRADE} closed />);
   expect(await screen.findByText('Lesson for next time')).toBeInTheDocument();
 });

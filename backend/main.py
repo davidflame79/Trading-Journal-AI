@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Query
+from fastapi import BackgroundTasks, FastAPI, UploadFile, File, Form, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
@@ -43,6 +43,11 @@ from trade_review import (
     router as trade_review_router, init_trade_reviews_table, move_reviews_on_regroup, delete_trade_review,
     trade_facts, bars_window, generate_review, save_review, load_review,
 )
+from trade_summary import (
+    router as trade_summary_router, init_trade_summaries_table, delete_trade_summary, queue_summaries,
+    generate_summary, mark_writing, mark_ready, mark_failed, summary_of, summary_dates,
+)
+from trade_plans import _is_closed
 
 load_dotenv()
 
@@ -58,6 +63,7 @@ async def lifespan(app: FastAPI):
         init_trade_comments_table(_conn)
         init_trade_plans_table(_conn)
         init_trade_reviews_table(_conn)
+        init_trade_summaries_table(_conn)
     finally:
         _conn.close()
     Path(UPLOAD_DIR).mkdir(exist_ok=True)
@@ -91,6 +97,7 @@ app.include_router(exitlab_router)
 app.include_router(trade_comments_router)
 app.include_router(trade_plans_router)
 app.include_router(trade_review_router)
+app.include_router(trade_summary_router)
 
 
 # ── Dependency ─────────────────────────────────────────────────────────────────
@@ -467,10 +474,12 @@ def _replace_regrouped_trades(conn, account_id: int, trades: list[dict]) -> None
     move_comments_on_regroup(conn, account_id, trades, old_groups, moves)
     move_plans_on_regroup(conn, account_id, trades, old_groups, moves)
     move_reviews_on_regroup(conn, account_id, trades, old_groups, moves)
+    move_reviews_on_regroup(conn, account_id, trades, old_groups, moves, table="trade_summaries")
 
 
 @app.post("/api/import-csv")
 async def import_csv(
+    background_tasks: BackgroundTasks,
     account_id: int = Form(...),
     file: UploadFile = File(...),
     broker: str = Form('auto'),   # 'thinkorswim' | 'ibkr' | 'auto' (sniff the file)
@@ -532,9 +541,14 @@ async def import_csv(
         conn.rollback()
         raise
 
+    write_now = queue_summaries(conn, account_id, fills_before, datetime.utcnow().date())
+    for trade_group in write_now:
+        background_tasks.add_task(write_trade_summary, account_id, trade_group)
+
     return {
         "imported": imported,
         "skipped": skipped,
+        "summaries_writing": len(write_now),
         "errors": errors,
         "needs_comment": trades_needing_comments(conn, account_id, fills_before),
         "plan_matches": plans_for_new_trades(conn, account_id, fills_before),
@@ -842,6 +856,7 @@ def delete_trade(trade_id: int, conn: sqlite3.Connection = Depends(get_connectio
     delete_trade_comments(conn, trade['account_id'], trade_group)
     release_plan(conn, trade['account_id'], trade_group)
     delete_trade_review(conn, trade['account_id'], trade_group)
+    delete_trade_summary(conn, trade['account_id'], trade_group)
     conn.execute("DELETE FROM trades WHERE id=?", (trade_id,))
     conn.commit()
 
@@ -1497,7 +1512,7 @@ def get_calendar(
         diary_sql += " AND account_id = ?"
         diary_params.append(account_id)
     diary_rows = conn.execute(diary_sql, diary_params).fetchall()
-    diary_dates = {r['entry_date'] for r in diary_rows}
+    diary_dates = {r['entry_date'] for r in diary_rows} | summary_dates(conn, account_id)
 
     result = []
     for date, stats in sorted(day_stats.items()):
@@ -2239,6 +2254,41 @@ async def run_trade_review(trade_id: int, conn: sqlite3.Connection = Depends(get
         raise HTTPException(status_code=502, detail=f"Feedback could not be written: {e}")
     save_review(conn, trade, facts, content)
     return load_review(conn, trade)
+
+
+# ── Trade summaries for the Diary ────────────────────────────────────────────────
+
+async def write_trade_summary(account_id: int, trade_group: str) -> None:
+    """Runs after an import has answered as well as on request, so it opens its own connection."""
+    conn = get_db()
+    try:
+        trade = conn.execute("SELECT * FROM trades WHERE account_id=? AND trade_group=?",
+                             (account_id, trade_group)).fetchone()
+        if not trade:
+            return
+        try:
+            mark_writing(conn, trade)
+            facts = trade_facts(conn, trade)
+            today = datetime.utcnow().date()
+            anchor, days_back = bars_window(facts, today)
+            chart = await get_chart(trade['ticker'], anchor, timeframe="1Day", days_back=days_back)
+            content = await asyncio.to_thread(generate_summary, facts, chart.get('bars', []), today.isoformat())
+            mark_ready(conn, trade, facts, content)
+        except Exception as e:
+            mark_failed(conn, trade, e)
+    finally:
+        conn.close()
+
+
+@app.post("/api/trades/{trade_id:int}/summary")
+async def run_trade_summary(trade_id: int, conn: sqlite3.Connection = Depends(get_connection)):
+    trade = conn.execute("SELECT * FROM trades WHERE id=?", (trade_id,)).fetchone()
+    if not trade:
+        raise HTTPException(status_code=404, detail="Trade not found")
+    if not _is_closed(trade):
+        raise HTTPException(status_code=400, detail="This trade is still open")
+    await write_trade_summary(trade['account_id'], trade['trade_group'])
+    return {"summary": summary_of(conn, trade)}
 
 
 # ── Brain AI Chatbot ────────────────────────────────────────────────────────────

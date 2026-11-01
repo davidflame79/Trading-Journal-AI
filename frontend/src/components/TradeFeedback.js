@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Sparkles } from 'lucide-react';
 import { tradesApi } from '../api';
 import { PanelHead } from './ui';
+import { WriteSummaryButton } from './TradeSummaries';
 
 const errorText = (e) => e.response?.data?.detail || e.message;
 
@@ -88,6 +89,7 @@ export default function TradeFeedback({ trade, changed, closed }) {
             </button>
           </div>
         )}
+        {closed && <WriteSummaryButton trade={trade} />}
       </div>
     </section>
   );

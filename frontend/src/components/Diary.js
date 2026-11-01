@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp, BookOpen, Trash2 } from 'lucide-react';
 import { diaryApi, API_BASE } from '../api';
 import { PageHeader } from './ui';
+import { TradeSummaryCard, useTradeSummaries } from './TradeSummaries';
 
 const BACKEND = API_BASE;
 
@@ -217,10 +218,11 @@ function DiaryCard({ entry, onDeleted }) {
   );
 }
 
-export default function Diary({ accountId }) {
+export default function Diary({ accountId, onOpenDetail }) {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { summaries, error: summariesError, reload: reloadSummaries } = useTradeSummaries(accountId);
 
   useEffect(() => {
     setLoading(true);
@@ -240,14 +242,19 @@ export default function Diary({ accountId }) {
     (acc[e.entry_date] = acc[e.entry_date] || []).push(e);
     return acc;
   }, {});
-  const dates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
+  const summariesByDate = summaries.reduce((acc, s) => {
+    (acc[s.close_date] = acc[s.close_date] || []).push(s);
+    return acc;
+  }, {});
+  const dates = [...new Set([...Object.keys(byDate), ...Object.keys(summariesByDate)])].sort((a, b) => b.localeCompare(a));
+  const total = entries.length + summaries.length;
 
   return (
     <div>
       <PageHeader
         title="Diary"
-        subtitle={!loading && entries.length > 0
-          ? <><span className="num">{entries.length}</span> {entries.length === 1 ? 'entry' : 'entries'} across <span className="num">{dates.length}</span> {dates.length === 1 ? 'day' : 'days'}</>
+        subtitle={!loading && total > 0
+          ? <><span className="num">{total}</span> {total === 1 ? 'entry' : 'entries'} across <span className="num">{dates.length}</span> {dates.length === 1 ? 'day' : 'days'}</>
           : 'AI readings of your trading notes, newest first'}
       />
 
@@ -257,15 +264,15 @@ export default function Diary({ accountId }) {
         </div>
       )}
 
-      {error && (
-        <div className="notice neg" role="alert">{error}</div>
+      {(error || summariesError) && (
+        <div className="notice neg" role="alert">{error || summariesError}</div>
       )}
 
-      {!loading && entries.length === 0 && (
+      {!loading && total === 0 && (
         <div className="card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-secondary)' }}>
           <BookOpen size={40} style={{ marginBottom: 16, opacity: 0.6 }} />
           <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 8, color: 'var(--text-primary)' }}>No diary entries yet</div>
-          <div style={{ fontSize: 14 }}>Upload a diary screenshot on the Import page to get started.</div>
+          <div style={{ fontSize: 14 }}>Summaries appear here when an import closes a trade. You can also upload a diary screenshot on the Import page.</div>
         </div>
       )}
 
@@ -276,10 +283,13 @@ export default function Diary({ accountId }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h2 className="section-title num">{date}</h2>
               <span className="chip">
-                <span className="num">{byDate[date].length}</span>&nbsp;{byDate[date].length === 1 ? 'entry' : 'entries'}
+                {(() => {
+                  const n = (byDate[date] || []).length + (summariesByDate[date] || []).length;
+                  return <><span className="num">{n}</span>&nbsp;{n === 1 ? 'entry' : 'entries'}</>;
+                })()}
               </span>
             </div>
-            {byDate[date].length > 1 && (
+            {(byDate[date] || []).length > 1 && (
               <DeleteButton
                 label={`Delete all diary entries for ${date}`}
                 onDelete={() => diaryApi.deleteByDate(date, accountId).then(() => removeDate(date))}
@@ -288,8 +298,12 @@ export default function Diary({ accountId }) {
             )}
           </div>
 
+          {(summariesByDate[date] || []).map(summary => (
+            <TradeSummaryCard key={summary.id} summary={summary} onChanged={reloadSummaries} onOpenDetail={onOpenDetail} />
+          ))}
+
           {/* Individual entry cards */}
-          {byDate[date].map(entry => (
+          {(byDate[date] || []).map(entry => (
             <DiaryCard
               key={entry.id}
               entry={entry}

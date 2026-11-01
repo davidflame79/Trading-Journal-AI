@@ -75,13 +75,14 @@ def init_trade_reviews_table(conn):
     conn.commit()
 
 
-def move_reviews_on_regroup(conn, account_id: int, trades: list[dict], old_groups: set, moves: dict) -> None:
-    """Feedback stays with the fill that opened its trade. If the target already has its own, that one is kept."""
+def move_reviews_on_regroup(conn, account_id: int, trades: list[dict], old_groups: set, moves: dict,
+                            table: str = "trade_reviews") -> None:
+    """Feedback and summaries stay with the fill that opened their trade. If the target already has its own, that one is kept."""
     if not old_groups:
         return
     marks = ",".join("?" for _ in old_groups)
     rows = conn.execute(
-        f"SELECT id, trade_group, opening_fill_key FROM trade_reviews WHERE account_id=? AND trade_group IN ({marks})",
+        f"SELECT id, trade_group, opening_fill_key FROM {table} WHERE account_id=? AND trade_group IN ({marks})",
         [account_id, *old_groups],
     ).fetchall()
     for row in rows:
@@ -92,8 +93,8 @@ def move_reviews_on_regroup(conn, account_id: int, trades: list[dict], old_group
                 target = t['trade_group']
                 break
         if target != old:
-            conn.execute("UPDATE OR IGNORE trade_reviews SET trade_group=? WHERE id=?", (target, row['id']))
-            conn.execute("DELETE FROM trade_reviews WHERE id=? AND trade_group=?", (row['id'], old))
+            conn.execute(f"UPDATE OR IGNORE {table} SET trade_group=? WHERE id=?", (target, row['id']))
+            conn.execute(f"DELETE FROM {table} WHERE id=? AND trade_group=?", (row['id'], old))
 
 
 def delete_trade_review(conn, account_id: int, trade_group: str) -> None:
