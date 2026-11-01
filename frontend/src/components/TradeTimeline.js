@@ -161,7 +161,7 @@ function FillRow({ item, tradeId, onChanged }) {
 }
 
 /** Fills as they happened, with the reasons written beside them. */
-export default function TradeTimeline({ trade, executions }) {
+export default function TradeTimeline({ trade, executions, onCommentsChange }) {
   const [comments, setComments] = useState([]);
   const [loadError, setLoadError] = useState(null);
   const [addingNote, setAddingNote] = useState(false);
@@ -174,6 +174,7 @@ export default function TradeTimeline({ trade, executions }) {
   }, [trade.id]);
 
   useEffect(() => { load(); }, [load, trade.executions]);
+  useEffect(() => { if (onCommentsChange) onCommentsChange(); }, [comments, onCommentsChange]);
 
   const items = buildTimeline(executions, comments, trade.side);
 

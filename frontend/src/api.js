@@ -50,6 +50,8 @@ export const tradesApi = {
   getPlan: (id) => api.get(`/api/trades/${id}/plan`),
   attachPlan: (id, planId) => api.post(`/api/trades/${id}/plan`, { plan_id: planId }),
   detachPlan: (id) => api.delete(`/api/trades/${id}/plan`),
+  getReview: (id) => api.get(`/api/trades/${id}/review`),
+  runReview: (id) => api.post(`/api/trades/${id}/review`),
 };
 
 export const plansApi = {

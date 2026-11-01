@@ -452,6 +452,13 @@ summary:focus-visible {
 .td-main { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
 .td-lower { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--space-5); align-items: start; }
 .td-lower > * { min-width: 0; }
+.td-chart-row { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: var(--space-5); align-items: start; }
+.td-chart-row > * { min-width: 0; }
+.td-feedback { max-height: 600px; overflow-y: auto; }
+@media (max-width: 1400px) {
+  .td-chart-row { grid-template-columns: minmax(0, 1fr); }
+  .td-feedback { max-height: none; }
+}
 @media (max-width: 1400px) {
   .td-lower { grid-template-columns: minmax(0, 1fr); }
 }

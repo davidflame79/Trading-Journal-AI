@@ -4,6 +4,7 @@ import sqlite3
 import aiofiles
 from pathlib import Path
 from datetime import datetime, timedelta
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Query
@@ -38,6 +39,10 @@ from trade_plans import (
     router as trade_plans_router, init_trade_plans_table, move_plans_on_regroup,
     rekey_opening_fill, release_plan, plans_for_new_trades,
 )
+from trade_review import (
+    router as trade_review_router, init_trade_reviews_table, move_reviews_on_regroup, delete_trade_review,
+    trade_facts, bars_window, generate_review, save_review, load_review,
+)
 
 load_dotenv()
 
@@ -52,6 +57,7 @@ async def lifespan(app: FastAPI):
         init_library_tables(_conn)
         init_trade_comments_table(_conn)
         init_trade_plans_table(_conn)
+        init_trade_reviews_table(_conn)
     finally:
         _conn.close()
     Path(UPLOAD_DIR).mkdir(exist_ok=True)
@@ -84,6 +90,7 @@ app.include_router(library_router)
 app.include_router(exitlab_router)
 app.include_router(trade_comments_router)
 app.include_router(trade_plans_router)
+app.include_router(trade_review_router)
 
 
 # ── Dependency ─────────────────────────────────────────────────────────────────
@@ -459,6 +466,7 @@ def _replace_regrouped_trades(conn, account_id: int, trades: list[dict]) -> None
             conn.execute("UPDATE trade_tags SET trade_group=? WHERE trade_group=?", (target, g))
     move_comments_on_regroup(conn, account_id, trades, old_groups, moves)
     move_plans_on_regroup(conn, account_id, trades, old_groups, moves)
+    move_reviews_on_regroup(conn, account_id, trades, old_groups, moves)
 
 
 @app.post("/api/import-csv")
@@ -833,6 +841,7 @@ def delete_trade(trade_id: int, conn: sqlite3.Connection = Depends(get_connectio
     conn.execute("DELETE FROM trade_analysis WHERE trade_group=?", (trade_group,))
     delete_trade_comments(conn, trade['account_id'], trade_group)
     release_plan(conn, trade['account_id'], trade_group)
+    delete_trade_review(conn, trade['account_id'], trade_group)
     conn.execute("DELETE FROM trades WHERE id=?", (trade_id,))
     conn.commit()
 
@@ -2207,6 +2216,29 @@ def get_daily_summary(
     summary['date'] = date
     summary['cached'] = False
     return summary
+
+
+# ── Trade feedback ───────────────────────────────────────────────────────────────
+
+@app.post("/api/trades/{trade_id:int}/review")
+async def run_trade_review(trade_id: int, conn: sqlite3.Connection = Depends(get_connection)):
+    trade = conn.execute("SELECT * FROM trades WHERE id=?", (trade_id,)).fetchone()
+    if not trade:
+        raise HTTPException(status_code=404, detail="Trade not found")
+    facts = trade_facts(conn, trade)
+    today = datetime.utcnow().date()
+    anchor, days_back = bars_window(facts, today)
+    chart = await get_chart(trade['ticker'], anchor, timeframe="1Day", days_back=days_back)
+    try:
+        content = await asyncio.to_thread(generate_review, facts, chart.get('bars', []), today.isoformat())
+    except ValueError as e:
+        if "ANTHROPIC_API_KEY" in str(e):
+            raise HTTPException(status_code=400, detail="Add ANTHROPIC_API_KEY to backend/.env to get feedback on a trade.")
+        raise HTTPException(status_code=502, detail=f"Feedback could not be written: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Feedback could not be written: {e}")
+    save_review(conn, trade, facts, content)
+    return load_review(conn, trade)
 
 
 # ── Brain AI Chatbot ────────────────────────────────────────────────────────────

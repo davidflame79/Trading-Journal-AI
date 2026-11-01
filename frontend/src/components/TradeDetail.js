@@ -1,11 +1,12 @@
 import { excursionText } from '../utils/excursions';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, ChevronLeft, ChevronRight, PlusCircle, Trash2, Pencil } from 'lucide-react';
 import { tradesApi, chartApi } from '../api';
 import TradingChart from './TradingChart';
 import TradeExits from './exitlab/TradeExits';
 import TradeTimeline from './TradeTimeline';
 import { TradePlanCard } from './TradePlans';
+import TradeFeedback from './TradeFeedback';
 import { DemoLabel } from './exitlab/shared';
 import { PageHeader, KpiStrip, KpiCell, MoneyValue, PanelHead } from './ui';
 
@@ -27,6 +28,12 @@ function parseExecs(trade) {
   if (Array.isArray(raw)) return raw;
   try { return JSON.parse(raw); } catch { return []; }
 }
+
+/** Every share bought has been sold, which is what closes a trade for feedback. */
+const isFlat = (trade) => {
+  const qty = (action) => parseExecs(trade).filter(e => e.action === action).reduce((n, e) => n + Number(e.qty || 0), 0);
+  return parseExecs(trade).length > 0 && qty('BOT') === qty('SOLD');
+};
 
 export function computeStats(trade) {
   const execs = parseExecs(trade);
@@ -331,6 +338,8 @@ export default function TradeDetail({ trade: initialTrade, tradeNavList = [], on
   const [trade, setTrade] = useState(initialTrade);
   const [tab, setTab] = useState(initialTab);
   const [analysis, setAnalysis] = useState(null);
+  const [notesVersion, setNotesVersion] = useState(0);
+  const onCommentsChange = useCallback(() => setNotesVersion(v => v + 1), []);
   const [tags, setTags] = useState([]);
 
   // Executions
@@ -621,16 +630,20 @@ export default function TradeDetail({ trade: initialTrade, tradeNavList = [], on
         </div>
 
         <div className="td-main">
-          {tab !== 'Exits' && <section className="card">
-            <TradingChart
-              ticker={trade.ticker}
-              date={trade.date}
-              executions={parseExecs(trade)}
-              side={trade.side}
-              analysis={analysis}
-              height={520}
-            />
-          </section>}
+          {tab !== 'Exits' && <div className="td-chart-row">
+            <section className="card">
+              <TradingChart
+                ticker={trade.ticker}
+                date={trade.date}
+                executions={parseExecs(trade)}
+                side={trade.side}
+                analysis={analysis}
+                defaultTimeframe="1Day"
+                height={520}
+              />
+            </section>
+            <TradeFeedback trade={trade} changed={`${notesVersion}|${JSON.stringify(analysis)}`} closed={isFlat(trade)} />
+          </div>}
 
           <div className="td-lower">
         {/* Middle: tabs + content */}
@@ -824,7 +837,7 @@ export default function TradeDetail({ trade: initialTrade, tradeNavList = [], on
                     )}
                   </>
                 )}
-                <TradeTimeline trade={trade} executions={parseExecs(trade)} />
+                <TradeTimeline trade={trade} executions={parseExecs(trade)} onCommentsChange={onCommentsChange} />
               </div>
             )}
 
